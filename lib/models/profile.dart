@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:bett_box/clash/core.dart';
 import 'package:bett_box/common/common.dart';
+import 'package:bett_box/common/import_normalize.dart';
 import 'package:bett_box/enum/enum.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -210,6 +211,7 @@ extension ProfileExtension on Profile {
         }
       } catch (_) {}
     }
+    content = ImportNormalize.toMihomo(content);
     content = utils.patchYamlConfig(content);
     if (validate) {
       final message =
@@ -245,6 +247,7 @@ extension ProfileExtension on Profile {
         }
       } catch (_) {}
     }
+    content = ImportNormalize.toMihomo(content);
     content = utils.patchYamlConfig(content);
     final message =
         await clashCore.validateConfig(content, ageSecretKey: ageSecretKey);

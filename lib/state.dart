@@ -677,6 +677,7 @@ class GlobalState {
       return <String, dynamic>{};
     }
     final profileId = targetProfile.id;
+    await SystemExplicitStore.instance.ensureLoaded();
     final configMap = await getProfileConfig(profileId);
     final rawConfig = await handleEvaluate(configMap, profile: targetProfile);
     final originalProxyGroups = rawConfig['proxy-groups'];
@@ -1119,6 +1120,7 @@ class GlobalState {
 
     rawConfig.remove('rule');
     rawConfig['rules'] = rules;
+    SystemExplicitStore.instance.apply(rawConfig);
     return rawConfig;
   }
 

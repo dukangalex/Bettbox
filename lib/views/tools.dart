@@ -29,6 +29,7 @@ import 'package:path/path.dart' show dirname, join;
 
 import 'backup_and_recovery.dart';
 import 'developer.dart';
+import 'system_explicit.dart';
 import 'theme.dart';
 
 class _SearchItem {
@@ -291,6 +292,17 @@ class _ToolViewState extends ConsumerState<ToolsView> {
           context,
           appLocalizations.basicConfig,
           const ConfigView(),
+        ),
+      ),
+      _SearchItem(
+        title: _systemExplicitTitle(context),
+        subtitle: _systemExplicitSubtitle(context),
+        category: settingsCategory,
+        leading: const Icon(Icons.tune),
+        onTap: (context, _) => _pushPage(
+          context,
+          _systemExplicitTitle(context),
+          const SystemExplicitView(),
         ),
       ),
       _SearchItem(
@@ -1403,6 +1415,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
           if (system.isWindows) _LoopbackItem(),
           if (system.isAndroid) _AccessItem(),
           _ConfigItem(),
+          const _SystemExplicitItem(),
           _OtherSettingItem(),
           _SettingItem(),
         ],
@@ -1583,6 +1596,35 @@ class _AccessItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SystemExplicitItem extends StatelessWidget {
+  const _SystemExplicitItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.next(
+      leading: const Icon(Icons.tune),
+      title: Text(_systemExplicitTitle(context)),
+      subtitle: Text(_systemExplicitSubtitle(context)),
+      delegate: NextDelegate(
+        title: _systemExplicitTitle(context),
+        builder: (_) => const SystemExplicitView(),
+      ),
+    );
+  }
+}
+
+String _systemExplicitTitle(BuildContext context) {
+  final zh = Localizations.localeOf(context).languageCode == 'zh';
+  return zh ? '系统显式' : 'System options';
+}
+
+String _systemExplicitSubtitle(BuildContext context) {
+  final zh = Localizations.localeOf(context).languageCode == 'zh';
+  return zh
+      ? '链式、防泄漏、防隐私、中国直连、严格路由'
+      : 'Chain, leak protection, privacy, China direct, strict route';
 }
 
 class _ConfigItem extends StatelessWidget {

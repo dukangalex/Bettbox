@@ -451,7 +451,10 @@ class AppController {
       final profile = profiles
           .where((e) => e.id == currentProfileId)
           .firstOrNull;
-      final profileName = profile?.label ?? 'Bettbox';
+      await SystemExplicitStore.instance.ensureLoaded();
+      final profileName = SystemExplicitStore.instance.notificationLabel(
+        profile?.label ?? 'Bettbox',
+      );
       final speedInfo = traffic.toString();
       await vpn_service.service?.updateNotificationSpeed(
         profileName,
@@ -1550,7 +1553,7 @@ class AppController {
     final platformFiles = await safeRun(
       () => picker.pickerFiles(
         allowMultiple: true,
-        allowedExtensions: ['yaml', 'yml'],
+        allowedExtensions: ['yaml', 'yml', 'json', 'txt'],
       ),
     );
     if (platformFiles == null || platformFiles.isEmpty) {
@@ -1560,7 +1563,10 @@ class AppController {
 
     final validFiles = platformFiles.where((file) {
       final name = file.name.toLowerCase();
-      return name.endsWith('.yaml') || name.endsWith('.yml');
+      return name.endsWith('.yaml') ||
+          name.endsWith('.yml') ||
+          name.endsWith('.json') ||
+          name.endsWith('.txt');
     }).toList();
 
     if (validFiles.isEmpty) {
