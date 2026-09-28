@@ -1,3 +1,4 @@
+import 'package:bett_box/common/path_guard.dart';
 import 'package:bett_box/common/system_explicit.dart';
 import 'package:bett_box/state.dart';
 import 'package:bett_box/widgets/widgets.dart';
@@ -15,10 +16,13 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
   final _entry = TextEditingController();
   final _landing = TextEditingController();
   var _ready = false;
+  var _note = '';
 
   @override
   void initState() {
     super.initState();
+    _note = PathGuard.instance.note.value;
+    PathGuard.instance.note.addListener(_onNote);
     SystemExplicitStore.instance.ensureLoaded().then((_) {
       if (!mounted) return;
       final value = SystemExplicitStore.instance.value;
@@ -30,9 +34,15 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
 
   @override
   void dispose() {
+    PathGuard.instance.note.removeListener(_onNote);
     _entry.dispose();
     _landing.dispose();
     super.dispose();
+  }
+
+  void _onNote() {
+    if (!mounted) return;
+    setState(() => _note = PathGuard.instance.note.value);
   }
 
   bool get _zh => Localizations.localeOf(context).languageCode == 'zh';
@@ -43,6 +53,13 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
     await SystemExplicitStore.instance.save();
     if (mounted) setState(() {});
     globalState.appController.updateClashConfigDebounce();
+    await PathGuard.instance.sync(
+      running: globalState.isStart,
+      change: (group, proxy) => globalState.appController.changeProxy(
+        groupName: group,
+        proxyName: proxy,
+      ),
+    );
   }
 
   @override
@@ -58,6 +75,28 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
           'Applied after scripts and the profile. Off leaves the profile unchanged.',
         ),
         items: [
+          ListItem.switchItem(
+            title: Text(_t('自适应通路', 'Adaptive path')),
+            subtitle: Text(
+              _t(
+                '当前节点连续两次测不通，就换到另一条还能用的节点。不退回直连，不改订阅。都不可用时保持原选择。建议同时打开防泄漏。',
+                'After two failed checks, switch to another working node. Never falls back to direct, and never edits the subscription.',
+              ),
+            ),
+            delegate: SwitchDelegate(
+              value: value.adapt,
+              onChanged: (on) {
+                value.adapt = on;
+                _commit();
+              },
+            ),
+          ),
+          ListItem(
+            title: Text(_t('最近一次切换', 'Last switch')),
+            subtitle: Text(
+              _note.isEmpty ? _t('还没有切换', 'None yet') : _note,
+            ),
+          ),
           ListItem.switchItem(
             title: Text(_t('防泄漏', 'Leak protection')),
             subtitle: Text(

@@ -1623,8 +1623,8 @@ String _systemExplicitTitle(BuildContext context) {
 String _systemExplicitSubtitle(BuildContext context) {
   final zh = Localizations.localeOf(context).languageCode == 'zh';
   return zh
-      ? '链式、防泄漏、防隐私、中国直连、严格路由'
-      : 'Chain, leak protection, privacy, China direct, strict route';
+      ? '自适应通路、链式、防泄漏、防隐私、中国直连、严格路由'
+      : 'Adaptive path, chain, leak protection, privacy, China direct, strict route';
 }
 
 class _ConfigItem extends StatelessWidget {

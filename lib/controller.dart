@@ -27,6 +27,7 @@ import 'package:yaml/yaml.dart';
 
 import 'common/archive.dart' show restoreBackupFiles;
 import 'common/common.dart';
+import 'common/path_guard.dart';
 import 'models/models.dart';
 import 'views/profiles/override_profile.dart';
 
@@ -184,6 +185,13 @@ class AppController {
       if (globalState.isStart && !_ref.read(runTimeProvider.notifier).isStart) {
         _ref.read(runTimeProvider.notifier).value = 0;
       }
+      unawaited(
+        PathGuard.instance.sync(
+          running: globalState.isStart,
+          change: (group, proxy) =>
+              changeProxy(groupName: group, proxyName: proxy),
+        ),
+      );
     } else {
       await globalState.handleStop();
       clashCore.resetTraffic();
@@ -191,6 +199,13 @@ class AppController {
       _ref.read(totalTrafficProvider.notifier).value = Traffic();
       _ref.read(runTimeProvider.notifier).value = null;
       addCheckIpNumDebounce();
+      unawaited(
+        PathGuard.instance.sync(
+          running: false,
+          change: (group, proxy) =>
+              changeProxy(groupName: group, proxyName: proxy),
+        ),
+      );
     }
   }
 

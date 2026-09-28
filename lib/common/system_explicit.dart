@@ -10,6 +10,7 @@ class SystemExplicitOptions {
   bool chinaDirect;
   bool strictRoute;
   bool chain;
+  bool adapt;
   String entry;
   String landing;
 
@@ -19,6 +20,7 @@ class SystemExplicitOptions {
     this.chinaDirect = false,
     this.strictRoute = false,
     this.chain = false,
+    this.adapt = false,
     this.entry = '',
     this.landing = '',
   });
@@ -32,6 +34,7 @@ class SystemExplicitOptions {
     'chinaDirect': chinaDirect,
     'strictRoute': strictRoute,
     'chain': chain,
+    'adapt': adapt,
     'entry': entry,
     'landing': landing,
   };
@@ -43,6 +46,7 @@ class SystemExplicitOptions {
       chinaDirect: json['chinaDirect'] == true,
       strictRoute: json['strictRoute'] == true,
       chain: json['chain'] == true,
+      adapt: json['adapt'] == true,
       entry: (json['entry'] ?? '').toString(),
       landing: (json['landing'] ?? '').toString(),
     );
