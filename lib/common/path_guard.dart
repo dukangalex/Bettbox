@@ -29,8 +29,10 @@ class PathGuard {
   final note = ValueNotifier<String>('');
   final Map<String, _Memory> _memory = {};
   final Map<String, DateTime> _switchedAt = {};
+  final ProbeBoard _probes = ProbeBoard();
 
   Timer? _timer;
+  Timer? _fast;
   PathSwitch? _change;
   var _busy = false;
 
@@ -43,13 +45,18 @@ class PathGuard {
     final want = running && SystemExplicitStore.instance.value.adapt;
     if (!want) {
       _timer?.cancel();
+      _fast?.cancel();
       _timer = null;
+      _fast = null;
       return;
     }
     if (_timer != null) return;
     unawaited(_tick());
     _timer = Timer.periodic(const Duration(seconds: 25), (_) {
       unawaited(_tick());
+    });
+    _fast = Timer.periodic(const Duration(seconds: 8), (_) {
+      unawaited(_wakeIfStalled());
     });
   }
 
@@ -103,11 +110,8 @@ class PathGuard {
     }
     if (currentType == null || !isLeafPath(currentType)) return;
 
-    final url = (testUrl != null && testUrl.isNotEmpty)
-        ? testUrl
-        : _testUrl();
-    final delay = await _probe(current, url);
     final now = DateTime.now();
+    final delay = await _confirm(current, _urls(testUrl, now), now);
     _remember(current, delay, now);
     if (!pathUnhealthy(_memory[current]?.streak ?? 0)) return;
 
@@ -121,8 +125,9 @@ class PathGuard {
       nodes: samples,
       now: now,
     );
+    final urls = _urls(testUrl, now);
     for (final name in ranked.take(3)) {
-      final candidateDelay = await _probe(name, url);
+      final candidateDelay = await _confirm(name, urls, DateTime.now());
       _remember(name, candidateDelay, DateTime.now());
       if (candidateDelay == null) continue;
       await _change!(groupName, name);
@@ -133,6 +138,60 @@ class PathGuard {
       return;
     }
     note.value = '通路保持：$groupName 仍使用 $current，暂无可用替换';
+  }
+
+  Future<void> _wakeIfStalled() async {
+    if (_busy || !globalState.isStart) return;
+    try {
+      if (await _trafficStalled()) unawaited(_tick());
+    } catch (_) {}
+  }
+
+  Future<bool> _trafficStalled() async {
+    final list = await clashCore.getConnections();
+    final now = DateTime.now();
+    var stalled = 0;
+    for (final item in list) {
+      if (item.metadata.network != 'tcp') continue;
+      if (item.chains.any(reservedPathNames.contains)) continue;
+      if (now.difference(item.start) < const Duration(seconds: 12)) continue;
+      if (item.upload > 0 && item.download == 0) stalled++;
+    }
+    return stalled >= 3;
+  }
+
+  List<String> _urls(String? groupUrl, DateTime now) {
+    final preferred = (groupUrl != null && groupUrl.isNotEmpty)
+        ? groupUrl
+        : _testUrl();
+    return _probes.order(
+      preferred: preferred,
+      presets: presetTestUrls,
+      now: now,
+    );
+  }
+
+  /// One answering address is enough. Two different addresses must fail
+  /// before the node itself is treated as down.
+  Future<int?> _confirm(String name, List<String> urls, DateTime now) async {
+    if (urls.isEmpty) return null;
+    final checking = _probes.isRetired(urls.first, now) ? urls.take(1) : urls.take(2);
+    final missed = <String>[];
+    for (final url in checking) {
+      final delay = await _probe(name, url);
+      if (delay != null) {
+        _probes.succeed(url);
+        for (final missedUrl in missed) {
+          if (_probes.missWhileNodeLived(missedUrl, now)) {
+            commonPrint.log('探测地址暂停使用：$missedUrl');
+            note.value = '探测地址已换掉，节点继续使用';
+          }
+        }
+        return delay;
+      }
+      missed.add(url);
+    }
+    return null;
   }
 
   Future<int?> _probe(String name, String url) async {

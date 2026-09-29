@@ -73,3 +73,54 @@ List<String> rankAlternates({
   });
   return usable.map((node) => node.name).toList();
 }
+
+/// A check address is retired only after it fails twice on nodes that
+/// still answer a different address. A dead node does not retire the address.
+class ProbeBoard {
+  final Map<String, int> _strikes = {};
+  final Map<String, DateTime> _retiredUntil = {};
+
+  bool isRetired(String url, DateTime now) {
+    final until = _retiredUntil[url];
+    return until != null && until.isAfter(now);
+  }
+
+  List<String> order({
+    required String preferred,
+    required List<String> presets,
+    required DateTime now,
+  }) {
+    final seen = <String>{};
+    final all = <String>[];
+    for (final url in [preferred, ...presets]) {
+      if (url.isEmpty || !seen.add(url)) continue;
+      all.add(url);
+    }
+    final active = <String>[];
+    final retired = <String>[];
+    for (final url in all) {
+      if (isRetired(url, now)) {
+        retired.add(url);
+      } else {
+        active.add(url);
+      }
+    }
+    if (active.isNotEmpty) return active;
+    return retired;
+  }
+
+  void succeed(String url) {
+    _strikes[url] = 0;
+    _retiredUntil.remove(url);
+  }
+
+  /// Returns true when the address is newly retired.
+  bool missWhileNodeLived(String url, DateTime now) {
+    final strikes = (_strikes[url] ?? 0) + 1;
+    _strikes[url] = strikes;
+    if (strikes < 2) return false;
+    _retiredUntil[url] = now.add(const Duration(minutes: 10));
+    _strikes[url] = 0;
+    return true;
+  }
+}
