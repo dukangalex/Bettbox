@@ -1,0 +1,76 @@
+name: android-apk
+
+on:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_VERSION="28.2.13676358"
+          yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --install "ndk;${NDK_VERSION}" >/dev/null
+          echo "ANDROID_NDK=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: core/go.sum
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.9'
+          cache: true
+
+      - name: Setup Keystore
+        shell: bash
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "${KEYSTORE}" ] || [ -z "${KEY_ALIAS}" ] || [ -z "${STORE_PASSWORD}" ] || [ -z "${KEY_PASSWORD}" ]; then
+            echo "No release keystore. The APK will use the debug signature."
+            exit 0
+          fi
+          echo "${KEYSTORE}" | base64 --decode > android/app/keystore.jks
+          {
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "storePassword=${STORE_PASSWORD}"
+            echo "keyPassword=${KEY_PASSWORD}"
+          } >> android/local.properties
+
+      - name: Build universal APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart run build_runner build -d
+          dart setup.dart android --arch universal --env stable
+          ls -lh dist || true
+          find dist -name '*.apk' -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bettbox-android-universal
+          path: dist/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
