@@ -1,64 +1,6 @@
-/// Runtime config changes for the system options. The saved subscription
-/// is not touched. Automatic groups lose DIRECT so a dead node cannot
-/// silently fall through. Plain DNS is replaced with encrypted resolvers
-/// only when the profile is not already using encrypted DNS.
+/// Runtime config changes. The saved subscription is not touched.
+/// Automatic groups lose DIRECT so a dead node cannot fall through.
 const explicitChainGroup = '链式落地';
-
-bool dnsServerEncrypted(String server) {
-  final value = server.trim().toLowerCase();
-  return value.startsWith('https://') ||
-      value.startsWith('tls://') ||
-      value.startsWith('quic://');
-}
-
-void hardenLeakDns(Map<String, dynamic> raw) {
-  raw['ipv6'] = false;
-  final current = raw['dns'];
-  final dns = current is Map
-      ? Map<String, dynamic>.from(current)
-      : <String, dynamic>{};
-  dns['enable'] = true;
-  dns['ipv6'] = false;
-  final mode = dns['enhanced-mode']?.toString() ?? '';
-  if (mode.isEmpty) dns['enhanced-mode'] = 'fake-ip';
-
-  final nameserver = dns['nameserver'];
-  final encrypted =
-      nameserver is List &&
-      nameserver.any((item) => dnsServerEncrypted(item.toString()));
-  if (!encrypted) {
-    dns['nameserver'] = [
-      'https://1.1.1.1/dns-query',
-      'https://8.8.8.8/dns-query',
-    ];
-  }
-  final fallback = dns['fallback'];
-  if (fallback is! List || fallback.isEmpty) {
-    dns['fallback'] = ['tls://1.1.1.1', 'tls://8.8.8.8'];
-    dns['fallback-filter'] = {
-      'geoip': true,
-      'geoip-code': 'CN',
-      'ipcidr': ['240.0.0.0/4'],
-    };
-  }
-  if (dns['default-nameserver'] is! List ||
-      (dns['default-nameserver'] as List).isEmpty) {
-    dns['default-nameserver'] = ['1.1.1.1', '8.8.8.8'];
-  }
-  if (dns['proxy-server-nameserver'] is! List ||
-      (dns['proxy-server-nameserver'] as List).isEmpty) {
-    dns['proxy-server-nameserver'] = ['1.1.1.1', '8.8.8.8'];
-  }
-  raw['dns'] = dns;
-
-  final tun = raw['tun'];
-  if (tun is Map) {
-    final hijack = tun['dns-hijack'];
-    if (hijack is! List || hijack.isEmpty) {
-      tun['dns-hijack'] = ['any:53'];
-    }
-  }
-}
 
 void dropAutomaticDirect(Map<String, dynamic> raw) {
   final groups = raw['proxy-groups'];

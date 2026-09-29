@@ -6,6 +6,7 @@ import 'package:bett_box/models/models.dart';
 import 'package:bett_box/pages/editor.dart';
 import 'package:bett_box/providers/providers.dart';
 import 'package:bett_box/state.dart';
+import 'package:bett_box/views/profile_chain.dart';
 import 'package:bett_box/views/profiles/edit_profile.dart';
 import 'package:bett_box/views/profiles/override_profile.dart';
 import 'package:bett_box/views/profiles/scripts.dart';
@@ -497,6 +498,15 @@ class ProfileItem extends StatelessWidget {
         label: appLocalizations.override,
         onPressed: () {
           _handlePushGenProfilePage(context, profile.id);
+        },
+      ),
+      PopupMenuItemData(
+        icon: Icons.alt_route,
+        label: Localizations.localeOf(context).languageCode == 'zh'
+            ? '链式代理'
+            : 'Chain',
+        onPressed: () {
+          BaseNavigator.push(context, ProfileChainPage(profile: profile));
         },
       ),
       PopupMenuItemData(

@@ -23,6 +23,7 @@ import 'package:synchronized/synchronized.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'common/common.dart';
+import 'common/profile_chain.dart';
 import 'controller.dart';
 import 'models/models.dart';
 
@@ -678,6 +679,7 @@ class GlobalState {
     }
     final profileId = targetProfile.id;
     await SystemExplicitStore.instance.ensureLoaded();
+    await ProfileChainStore.instance.ensureLoaded();
     final configMap = await getProfileConfig(profileId);
     final rawConfig = await handleEvaluate(configMap, profile: targetProfile);
     final originalProxyGroups = rawConfig['proxy-groups'];
@@ -1121,6 +1123,7 @@ class GlobalState {
     rawConfig.remove('rule');
     rawConfig['rules'] = rules;
     SystemExplicitStore.instance.apply(rawConfig);
+    ProfileChainStore.instance.apply(rawConfig, profileId);
     return rawConfig;
   }
 

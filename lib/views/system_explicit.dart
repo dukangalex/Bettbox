@@ -13,8 +13,6 @@ class SystemExplicitView extends ConsumerStatefulWidget {
 }
 
 class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
-  final _entry = TextEditingController();
-  final _landing = TextEditingController();
   var _ready = false;
   var _note = '';
 
@@ -25,9 +23,6 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
     PathGuard.instance.note.addListener(_onNote);
     SystemExplicitStore.instance.ensureLoaded().then((_) {
       if (!mounted) return;
-      final value = SystemExplicitStore.instance.value;
-      _entry.text = value.entry;
-      _landing.text = value.landing;
       setState(() => _ready = true);
     });
   }
@@ -35,8 +30,6 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
   @override
   void dispose() {
     PathGuard.instance.note.removeListener(_onNote);
-    _entry.dispose();
-    _landing.dispose();
     super.dispose();
   }
 
@@ -98,22 +91,6 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
             ),
           ),
           ListItem.switchItem(
-            title: Text(_t('防泄漏', 'Leak protection')),
-            subtitle: Text(
-              _t(
-                '关闭 IPv6，劫持 53 端口。明文 DNS 会改成加密解析，国内地址被污染时改走加密备用。已经在用加密 DNS 的配置保持原样。阻断 STUN。',
-                'Disables IPv6 and hijacks port 53. Plain DNS is replaced with encrypted resolvers, and poisoned domestic answers fall over to encrypted backup. Existing encrypted DNS is left alone. Blocks STUN.',
-              ),
-            ),
-            delegate: SwitchDelegate(
-              value: value.leak,
-              onChanged: (on) {
-                value.leak = on;
-                _commit();
-              },
-            ),
-          ),
-          ListItem.switchItem(
             title: Text(_t('防隐私', 'Privacy')),
             subtitle: Text(
               _t(
@@ -145,72 +122,6 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
               },
             ),
           ),
-          ListItem.switchItem(
-            title: Text(_t('严格路由', 'Strict route')),
-            subtitle: Text(
-              _t(
-                '开启后强制严格路由，覆盖配置、脚本和网络页里的关闭状态。',
-                'When on, forces strict route over the profile, scripts, and the network switch.',
-              ),
-            ),
-            delegate: SwitchDelegate(
-              value: value.strictRoute,
-              onChanged: (on) {
-                value.strictRoute = on;
-                _commit();
-              },
-            ),
-          ),
-          ListItem.switchItem(
-            title: Text(_t('链式代理', 'Chain')),
-            subtitle: Text(
-              _t(
-                '落地节点经由入口节点连出。配置里写明的节点直接套上入口。只存在于订阅提供器里的节点，会生成可选策略组「链式落地」。',
-                'The landing node dials through the entry. Inline nodes are linked directly. Nodes that only exist in a provider become a selectable group named 链式落地.',
-              ),
-            ),
-            delegate: SwitchDelegate(
-              value: value.chain,
-              onChanged: (on) {
-                value.chain = on;
-                _commit();
-              },
-            ),
-          ),
-          if (value.chain) ...[
-            ListItem.input(
-              title: Text(_t('入口节点', 'Entry')),
-              subtitle: Text(
-                _entry.text.isEmpty ? _t('节点名称', 'Node name') : _entry.text,
-              ),
-              delegate: InputDelegate(
-                title: _t('入口节点', 'Entry'),
-                value: _entry.text,
-                onChanged: (text) {
-                  value.entry = text ?? '';
-                  _entry.text = value.entry;
-                  _commit();
-                },
-              ),
-            ),
-            ListItem.input(
-              title: Text(_t('落地节点', 'Landing')),
-              subtitle: Text(
-                _landing.text.isEmpty
-                    ? _t('节点名称', 'Node name')
-                    : _landing.text,
-              ),
-              delegate: InputDelegate(
-                title: _t('落地节点', 'Landing'),
-                value: _landing.text,
-                onChanged: (text) {
-                  value.landing = text ?? '';
-                  _landing.text = value.landing;
-                  _commit();
-                },
-              ),
-            ),
-          ],
         ],
       ),
     );

@@ -6,50 +6,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Runtime policy applied after the profile, the script, and the built-in
 /// network overrides. Off by default so existing profiles keep their behavior.
 class SystemExplicitOptions {
-  bool leak;
   bool privacy;
   bool chinaDirect;
-  bool strictRoute;
-  bool chain;
   bool adapt;
-  String entry;
-  String landing;
 
   SystemExplicitOptions({
-    this.leak = false,
     this.privacy = false,
     this.chinaDirect = false,
-    this.strictRoute = false,
-    this.chain = false,
     this.adapt = false,
-    this.entry = '',
-    this.landing = '',
   });
 
-  bool get anyEnabled =>
-      leak || privacy || chinaDirect || strictRoute || chain;
+  bool get anyEnabled => privacy || chinaDirect;
 
   Map<String, dynamic> toJson() => {
-    'leak': leak,
     'privacy': privacy,
     'chinaDirect': chinaDirect,
-    'strictRoute': strictRoute,
-    'chain': chain,
     'adapt': adapt,
-    'entry': entry,
-    'landing': landing,
   };
 
   factory SystemExplicitOptions.fromJson(Map<String, dynamic> json) {
     return SystemExplicitOptions(
-      leak: json['leak'] == true,
       privacy: json['privacy'] == true,
       chinaDirect: json['chinaDirect'] == true,
-      strictRoute: json['strictRoute'] == true,
-      chain: json['chain'] == true,
       adapt: json['adapt'] == true,
-      entry: (json['entry'] ?? '').toString(),
-      landing: (json['landing'] ?? '').toString(),
     );
   }
 }
@@ -88,11 +67,6 @@ class SystemExplicitStore {
     if (value.adapt) dropAutomaticDirect(raw);
     if (!value.anyEnabled) return;
     final rules = <dynamic>[];
-    if (value.leak) {
-      hardenLeakDns(raw);
-      rules.add('AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT');
-      rules.add('IP-CIDR6,::/0,REJECT,no-resolve');
-    }
     if (value.privacy) {
       rules.add('AND,((NETWORK,UDP),(DST-PORT,5353)),REJECT');
       rules.add('AND,((NETWORK,UDP),(DST-PORT,5355)),REJECT');
@@ -101,13 +75,6 @@ class SystemExplicitStore {
     if (value.chinaDirect) {
       rules.add('GEOSITE,geolocation-cn,DIRECT');
       rules.add('GEOIP,CN,DIRECT,no-resolve');
-    }
-    if (value.strictRoute) {
-      final tun = raw['tun'];
-      if (tun is Map) tun['strict-route'] = true;
-    }
-    if (value.chain) {
-      applyChainPolicy(raw, entry: value.entry, landing: value.landing);
     }
     final existing = raw['rules'];
     if (existing is List) rules.addAll(existing);
