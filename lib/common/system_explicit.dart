@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:bett_box/common/explicit_policy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Runtime policy applied after the profile, the script, and the built-in
@@ -83,21 +84,12 @@ class SystemExplicitStore {
     await prefs.setString(_key, jsonEncode(value.toJson()));
   }
 
-  /// Highest priority. Does not rewrite the saved subscription.
   void apply(Map<String, dynamic> raw) {
+    if (value.adapt) dropAutomaticDirect(raw);
     if (!value.anyEnabled) return;
     final rules = <dynamic>[];
     if (value.leak) {
-      raw['ipv6'] = false;
-      final dns = raw['dns'];
-      if (dns is Map) dns['ipv6'] = false;
-      final tun = raw['tun'];
-      if (tun is Map) {
-        final hijack = tun['dns-hijack'];
-        if (hijack is! List || hijack.isEmpty) {
-          tun['dns-hijack'] = ['any:53'];
-        }
-      }
+      hardenLeakDns(raw);
       rules.add('AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT');
       rules.add('IP-CIDR6,::/0,REJECT,no-resolve');
     }
@@ -114,29 +106,12 @@ class SystemExplicitStore {
       final tun = raw['tun'];
       if (tun is Map) tun['strict-route'] = true;
     }
-    _applyChain(raw);
+    if (value.chain) {
+      applyChainPolicy(raw, entry: value.entry, landing: value.landing);
+    }
     final existing = raw['rules'];
     if (existing is List) rules.addAll(existing);
     raw['rules'] = rules;
-  }
-
-  void _applyChain(Map<String, dynamic> raw) {
-    if (!value.chain) return;
-    final entry = value.entry.trim();
-    final landing = value.landing.trim();
-    if (entry.isEmpty || landing.isEmpty || entry == landing) return;
-    final proxies = raw['proxies'];
-    if (proxies is! List) return;
-    Map? target;
-    var hasEntry = false;
-    for (final proxy in proxies) {
-      if (proxy is! Map) continue;
-      if (proxy['name']?.toString() == entry) hasEntry = true;
-      if (proxy['name']?.toString() == landing) target = proxy;
-    }
-    if (hasEntry && target != null) {
-      target['dialer-proxy'] = entry;
-    }
   }
 
   String notificationLabel(String profileLabel) {

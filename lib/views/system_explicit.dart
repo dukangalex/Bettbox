@@ -79,8 +79,8 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
             title: Text(_t('自适应通路', 'Adaptive path')),
             subtitle: Text(
               _t(
-                '发出数据却收不到回包时会立刻复查。只切换正在走流量的策略组。连续两次、并且换过探测地址仍测不通，才换节点，并放开卡在旧节点上的连接。探测地址自己失效会停用。最近可用的节点会被记住。不退回直连，不改订阅。',
-                'If traffic stalls, check immediately and only switch the group that is carrying it. Two failures on different check addresses are required. Stuck connections on the old node are released. A bad check address is dropped. Recent working nodes are remembered. Never falls back to direct.',
+                '发出数据却收不到回包时会立刻复查。只切换正在走流量的手动组。连续两次、并且换过探测地址仍测不通，才换节点，并放开旧节点上卡住的连接。自动测速组不再把直连当作失败后的退路。不改订阅。',
+                'If traffic stalls, check immediately and only switch the manual group carrying it. Two failures on different check addresses are required, then stuck connections are released. Automatic groups can no longer fall back to direct. The subscription is not edited.',
               ),
             ),
             delegate: SwitchDelegate(
@@ -101,8 +101,8 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
             title: Text(_t('防泄漏', 'Leak protection')),
             subtitle: Text(
               _t(
-                '关闭 IPv6，劫持 DNS，阻断 STUN。已有的 IPv6 与 QUIC 开关保持原样。',
-                'Disables IPv6, hijacks DNS, and rejects STUN. Existing IPv6 and QUIC switches stay as they are.',
+                '关闭 IPv6，劫持 53 端口。明文 DNS 会改成加密解析，国内地址被污染时改走加密备用。已经在用加密 DNS 的配置保持原样。阻断 STUN。',
+                'Disables IPv6 and hijacks port 53. Plain DNS is replaced with encrypted resolvers, and poisoned domestic answers fall over to encrypted backup. Existing encrypted DNS is left alone. Blocks STUN.',
               ),
             ),
             delegate: SwitchDelegate(
@@ -165,8 +165,8 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
             title: Text(_t('链式代理', 'Chain')),
             subtitle: Text(
               _t(
-                '落地节点经由入口节点连出。名称必须是配置里的节点名。',
-                'The landing node dials through the entry node. Both names must exist in the profile.',
+                '落地节点经由入口节点连出。配置里写明的节点直接套上入口。只存在于订阅提供器里的节点，会生成可选策略组「链式落地」。',
+                'The landing node dials through the entry. Inline nodes are linked directly. Nodes that only exist in a provider become a selectable group named 链式落地.',
               ),
             ),
             delegate: SwitchDelegate(
