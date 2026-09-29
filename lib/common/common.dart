@@ -35,6 +35,7 @@ export 'qr_reader.dart';
 export 'render.dart';
 export 'request.dart';
 export 'scroll.dart';
+export 'string.dart';
 export 'system_explicit.dart';
 export 'system.dart';
 export 'task.dart';
