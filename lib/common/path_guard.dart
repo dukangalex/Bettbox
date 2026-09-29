@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:bett_box/clash/core.dart';
 import 'package:bett_box/common/constant.dart';
@@ -9,6 +10,7 @@ import 'package:bett_box/enum/enum.dart';
 import 'package:bett_box/models/common.dart';
 import 'package:bett_box/state.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 typedef PathSwitch = Future<void> Function(String groupName, String proxyName);
 
@@ -35,6 +37,9 @@ class PathGuard {
   Timer? _fast;
   PathSwitch? _change;
   var _busy = false;
+  var _loaded = false;
+
+  static const _storeKey = 'path_guard_v1';
 
   Future<void> sync({
     required bool running,
@@ -51,6 +56,7 @@ class PathGuard {
       return;
     }
     if (_timer != null) return;
+    await _load();
     unawaited(_tick());
     _timer = Timer.periodic(const Duration(seconds: 25), (_) {
       unawaited(_tick());
@@ -68,15 +74,30 @@ class PathGuard {
     _busy = true;
     try {
       final groups = await clashCore.getProxiesGroups();
-      final selectors = groups
-          .where(
-            (group) =>
-                group.type == GroupType.Selector && group.hidden != true,
-          )
-          .take(4);
-      for (final group in selectors) {
+      final selectors =
+          groups
+              .where(
+                (group) =>
+                    group.type == GroupType.Selector && group.hidden != true,
+              )
+              .toList()
+            ..sort((a, b) => _leafCount(b).compareTo(_leafCount(a)));
+      final chainNames = await _chainNames(selectors);
+      final mode = await _modeName();
+      final global = groups.where((group) => group.name == 'GLOBAL');
+      final names = groupsToHeal(
+        selectorsBySize: selectors.map((group) => group.name).toList(),
+        globalNow: global.isEmpty ? null : global.first.now,
+        chainNames: chainNames,
+        mode: mode,
+      );
+      final byName = {for (final group in groups) group.name: group};
+      for (final name in names) {
+        final group = byName[name];
+        if (group == null) continue;
         await _heal(group.name, group.now ?? '', group.all, group.testUrl);
       }
+      await _write();
     } catch (e) {
       commonPrint.log('通路检查失败: $e');
     } finally {
@@ -132,6 +153,7 @@ class PathGuard {
       if (candidateDelay == null) continue;
       await _change!(groupName, name);
       _switchedAt[groupName] = DateTime.now();
+      await _release(current);
       final text = '通路切换：$groupName  $current → $name';
       note.value = text;
       commonPrint.log(text);
@@ -223,5 +245,106 @@ class PathGuard {
     final configured = globalState.config.appSetting.testUrl;
     if (configured.isEmpty) return defaultTestUrl;
     return configured;
+  }
+
+  int _leafCount(Group group) {
+    var count = 0;
+    for (final proxy in group.all) {
+      if (isLeafPath(proxy.type)) count++;
+    }
+    return count;
+  }
+
+  Future<String> _modeName() async {
+    try {
+      return (await clashCore.getMode()).name;
+    } catch (_) {
+      return Mode.rule.name;
+    }
+  }
+
+  Future<Set<String>> _chainNames(List<Group> selectors) async {
+    final names = <String>{};
+    try {
+      final list = await clashCore.getConnections();
+      for (final item in list) {
+        names.addAll(item.chains);
+      }
+    } catch (_) {}
+    for (final group in selectors) {
+      final now = group.now;
+      if (now != null && now.isNotEmpty && names.contains(now)) {
+        names.add(group.name);
+      }
+    }
+    return names;
+  }
+
+  Future<void> _release(String node) async {
+    try {
+      final list = await clashCore.getConnections();
+      for (final item in list) {
+        if (item.chains.contains(node)) clashCore.closeConnection(item.id);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _load() async {
+    if (_loaded) return;
+    _loaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storeKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final now = DateTime.now();
+      final nodes = decoded['nodes'];
+      if (nodes is Map) {
+        nodes.forEach((key, value) {
+          if (value is! Map) return;
+          final memory = _memory.putIfAbsent(key.toString(), _Memory.new);
+          final latency = value['latencyMs'];
+          if (latency is int && latency > 0) memory.latencyMs = latency;
+          final cool = value['coolUntil'];
+          if (cool is int) {
+            final until = DateTime.fromMillisecondsSinceEpoch(cool);
+            if (until.isAfter(now)) memory.coolUntil = until;
+          }
+        });
+      }
+      final urls = decoded['urls'];
+      if (urls is Map) {
+        final millis = <String, int>{};
+        urls.forEach((key, value) {
+          if (value is int) millis[key.toString()] = value;
+        });
+        _probes.restoreRetired(millis, now);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _write() async {
+    try {
+      final now = DateTime.now();
+      final nodes = <String, dynamic>{};
+      _memory.forEach((name, memory) {
+        final cool = memory.coolUntil;
+        final keepCool = cool != null && cool.isAfter(now);
+        if (memory.latencyMs == null && !keepCool) return;
+        nodes[name] = {
+          'latencyMs': memory.latencyMs,
+          'coolUntil': keepCool ? cool.millisecondsSinceEpoch : null,
+        };
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _storeKey,
+        jsonEncode({
+          'nodes': nodes,
+          'urls': _probes.retiredUntilMillis(now),
+        }),
+      );
+    } catch (_) {}
   }
 }

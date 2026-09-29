@@ -79,8 +79,8 @@ class _SystemExplicitViewState extends ConsumerState<SystemExplicitView> {
             title: Text(_t('自适应通路', 'Adaptive path')),
             subtitle: Text(
               _t(
-                '发出数据却收不到回包时会立刻复查。连续两次、并且换过探测地址仍测不通，才换节点。探测地址自己失效会停用，不误伤节点。不退回直连，不改订阅。',
-                'If traffic goes out and nothing comes back, check immediately. Switch only after two failures on different check addresses. A bad check address is dropped instead of blaming the node. Never falls back to direct.',
+                '发出数据却收不到回包时会立刻复查。只切换正在走流量的策略组。连续两次、并且换过探测地址仍测不通，才换节点，并放开卡在旧节点上的连接。探测地址自己失效会停用。最近可用的节点会被记住。不退回直连，不改订阅。',
+                'If traffic stalls, check immediately and only switch the group that is carrying it. Two failures on different check addresses are required. Stuck connections on the old node are released. A bad check address is dropped. Recent working nodes are remembered. Never falls back to direct.',
               ),
             ),
             delegate: SwitchDelegate(

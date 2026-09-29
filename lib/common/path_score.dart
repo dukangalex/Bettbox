@@ -123,4 +123,52 @@ class ProbeBoard {
     _strikes[url] = 0;
     return true;
   }
+
+  Map<String, int> retiredUntilMillis(DateTime now) {
+    final out = <String, int>{};
+    for (final entry in _retiredUntil.entries) {
+      if (entry.value.isAfter(now)) {
+        out[entry.key] = entry.value.millisecondsSinceEpoch;
+      }
+    }
+    return out;
+  }
+
+  void restoreRetired(Map<String, int> millis, DateTime now) {
+    millis.forEach((url, ms) {
+      final until = DateTime.fromMillisecondsSinceEpoch(ms);
+      if (until.isAfter(now)) _retiredUntil[url] = until;
+    });
+  }
+}
+
+/// Rule mode leaves GLOBAL alone unless that group is actually in a
+/// connection chain. Direct mode never switches. Idle traffic falls back
+/// to one primary group so a quiet start can still recover.
+List<String> groupsToHeal({
+  required List<String> selectorsBySize,
+  required String? globalNow,
+  required Set<String> chainNames,
+  required String mode,
+}) {
+  if (mode == 'direct') return const [];
+  final known = selectorsBySize.toSet();
+  final live = <String>[];
+  for (final name in selectorsBySize) {
+    if (name == 'GLOBAL' && mode != 'global') continue;
+    if (chainNames.contains(name)) live.add(name);
+  }
+  if (live.isNotEmpty) return live.take(3).toList();
+  if (mode == 'global') {
+    if (globalNow != null &&
+        known.contains(globalNow) &&
+        globalNow != 'GLOBAL') {
+      return [globalNow];
+    }
+    if (known.contains('GLOBAL')) return const ['GLOBAL'];
+  }
+  for (final name in selectorsBySize) {
+    if (name != 'GLOBAL') return [name];
+  }
+  return const [];
 }
